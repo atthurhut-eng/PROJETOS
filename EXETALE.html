@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Undertale - Anomalia Decaída FULLSCREEN</title>
+    <style>
+        body {
+            margin: 0; padding: 0; background-color: #000; color: #fff;
+            font-family: 'Courier New', Courier, monospace; font-smooth: never;
+            -webkit-font-smoothing: none; -moz-osx-font-smoothing: none;
+            image-rendering: pixelated; display: flex; justify-content: center;
+            align-items: center; height: 100vh; width: 100vw; overflow: hidden; user-select: none;
+        }
+
+        #game-container {
+            width: 100vw; height: 100vh; background-color: #000; box-sizing: border-box;
+            display: none; flex-direction: column; justify-content: space-between; padding: 30px; position: relative;
+        }
+
+        /* --- AMBIENTE DE INTRODUÇÃO JOGÁVEL --- */
+        #intro-playable-stage {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: #020000; display: none; overflow: hidden; z-index: 150;
+        }
+        #buggy-hall {
+            position: absolute; top: 50%; left: 0; width: 2500px; height: 160px;
+            transform: translateY(-50%); border-top: 4px dashed #ff0033; border-bottom: 4px dashed #ff0033;
+            background: repeating-linear-gradient(90deg, #000, #000 40px, #100 40px, #100 80px);
+            animation: hall-glitch 0.3s infinite alternate;
+        }
+        @keyframes hall-glitch {
+            0% { opacity: 0.9; transform: translateY(-50%) skewX(0deg); }
+            100% { opacity: 1; transform: translateY(-50%) skewX(2deg); filter: hue-rotate(10deg); }
+        }
+        .glitch-pillar {
+            position: absolute; width: 20px; height: 100%; background: #ff0000; opacity: 0.2;
+            box-shadow: 0 0 15px #ff0000; animation: pillar-shiver 0.1s infinite;
+        }
+        @keyframes pillar-shiver { 0% { left: var(--px); transform: scaleX(1); } 100% { left: calc(var(--px) + 4px); transform: scaleX(0.7); } }
+        
+        #cliff-edge {
+            position: absolute; right: 400px; top: 0; width: 10px; height: 100%;
+            background: linear-gradient(90deg, #ff0033, transparent); box-shadow: 5px 0 20px #ff0000;
+        }
+        #void-text-warn {
+            position: absolute; right: 150px; top: 40%; color: #ff0033; font-size: 24px;
+            font-weight: bold; animation: pulse 0.5s infinite alternate; text-shadow: 0 0 8px #ff0000;
+        }
+
+        #frisk-overworld {
+            position: absolute; width: 24px; height: 24px; background-color: #ff0033;
+            clip-path: polygon(50% 0%, 100% 35%, 82% 100%, 50% 80%, 18% 100%, 0% 35%);
+            box-shadow: 0 0 10px #ff0000;
+        }
+
+        /* --- ÁREA DO CHEFE --- */
+        #monster-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+        .retro-boss {
+            position: relative; width: 120px; height: 120px; background-color: #ff0033;
+            animation: glitch-bounce 0.2s steps(2) infinite alternate; filter: drop-shadow(0 0 15px #ff0000); display: none;
+        }
+        .retro-boss::before {
+            content: ""; position: absolute; top: -20px; left: -15px; width: 35px; height: 20px; background: #ff0033;
+            box-shadow: 110px 50px #ff0033, -25px 90px #ff0033;
+        }
+        .retro-boss::after {
+            content: ""; position: absolute; top: 35px; left: 20px; width: 80px; height: 15px; background: #000; box-shadow: 0 30px 0 #000;
+        }
+        @keyframes glitch-bounce {
+            0% { transform: translateY(0px) skewX(-10deg) scaleY(1); filter: hue-rotate(0deg) saturate(2); }
+            100% { transform: translateY(-12px) skewX(15deg) scaleY(1.1); filter: hue-rotate(180deg) saturate(5); }
+        }
+
+        #boss-damage-container { position: absolute; display: none; flex-direction: column; align-items: center; z-index: 50; animation: pop-damage 1.5s forwards; }
+        #damage-number { font-size: 38px; color: #ff0000; font-weight: 900; margin-bottom: 5px; text-shadow: 2px 2px #000; }
+        .boss-hp-wrapper { width: 160px; height: 16px; background-color: #440000; border: 2px solid #000; }
+        #boss-hp-fill { width: 100%; height: 100%; background-color: #ff0033; }
+        @keyframes pop-damage { 0% { transform: translateY(0); opacity: 1; } 10% { transform: translateY(-15px); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(-20px); } }
+
+        /* --- CAIXA DE BATALHA --- */
+        #battle-box {
+            width: 100%; height: 35vh; border: 6px solid #ff0033; background-color: #050000;
+            position: relative; box-sizing: border-box; padding: 24px; overflow: hidden; box-shadow: inset 0 0 20px rgba(255,0,0,0.3);
+        }
+        #dialogue-text { font-size: 28px; font-weight: bold; line-height: 1.5; letter-spacing: 1px; white-space: pre-wrap; }
+        
+        .menu-list { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; list-style: none; padding: 0; margin: 0; font-size: 28px; }
+        .menu-item::before { content: "  "; }
+        .menu-item.selected::before { content: "♥ "; color: #ff0000; }
+        .menu-item.selected { color: #ff0033; }
+
+        #attack-ui {
+            display: none; position: relative; width: 100%; height: 100%;
+            background: linear-gradient(to right, #000 10%, #400 40%, #800 50%, #400 60%, #000 90%); border: 2px solid #ff0000;
+        }
+        #attack-target { position: absolute; left: 50%; top: 0; width: 30px; height: 100%; background-color: #ff0055; transform: translateX(-50%); }
+        #attack-bar { position: absolute; left: 0; top: 0; width: 16px; height: 100%; background-color: #ff0000; box-shadow: 0 0 10px #ff0000; }
+
+        #soul {
+            width: 18px; height: 18px; background-color: #ff0000;
+            clip-path: polygon(50% 0%, 100% 35%, 82% 100%, 50% 80%, 18% 100%, 0% 35%);
+            position: absolute; display: none; z-index: 10;
+        }
+
+        .bullet { position: absolute; }
+        .bullet.star { width: 16px; height: 16px; background-color: #ff0000; border-radius: 50% 0 50% 0; transform: rotate(-45deg); box-shadow: 0 0 6px #ff0000; }
+        .bullet.star::after { content: ''; position: absolute; width: 6px; height: 6px; background: #000; border-radius: 50%; top: 5px; left: 5px; }
+        .bullet.spear { width: 65px; height: 10px; background: linear-gradient(90deg, #220033, #000, #9900ff); border-left: 3px solid #fff; box-shadow: -4px 0 8px #9900ff; }
+        .bullet.bone { width: 20px; height: 140px; background: linear-gradient(to top, #550000, #ff0000); clip-path: polygon(50% 0%, 100% 100%, 0% 100%); }
+        .bullet.bone-inv { width: 20px; height: 140px; background: linear-gradient(to bottom, #550000, #ff0000); clip-path: polygon(0% 0%, 100% 0%, 50% 100%); }
+        .bullet.petal { width: 16px; height: 16px; background-color: #6600cc; border-radius: 0 50% 50% 50%; transform: rotate(45deg); box-shadow: 0 0 5px #6600cc; }
+        .bullet.glitch-block { width: 30px; height: 30px; background: #00ff66; box-shadow: 0 0 12px #00ff66; animation: glitch-flash 0.1s infinite alternate; }
+        @keyframes glitch-flash { 0% { opacity: 0.7; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1.1) skewX(5deg); } }
+        
+        .laser-v-warn, .laser-h-warn { position: absolute; background-color: rgba(255, 0, 0, 0.4); display: none; }
+        .laser-v-warn { width: 70px; height: 100%; top: 0; border-left: 3px dashed #ff0000; border-right: 3px dashed #ff0000; }
+        .laser-h-warn { height: 60px; width: 100%; left: 0; border-top: 3px dashed #ff0000; border-bottom: 3px dashed #ff0000; }
+        .laser-v-beam, .laser-h-beam { position: absolute; background-color: #ff0033; display: none; box-shadow: 0 0 35px #ff0000; }
+        .laser-v-beam { width: 70px; height: 100%; top: 0; }
+        .laser-h-beam { height: 60px; width: 100%; left: 0; }
+
+        #hud { display: none; align-items: center; font-size: 26px; font-weight: bold; margin: 20px 0; letter-spacing: 1px; }
+        .hp-bar-container { width: 250px; height: 26px; background-color: #440000; margin: 0 20px; }
+        #hp-bar { width: 100%; height: 100%; background-color: #ff0033; transition: width 0.1s; }
+
+        #buttons-container { display: none; justify-content: space-between; width: 100%; }
+        .btn {
+            border: 4px solid #880000; padding: 12px 0; font-size: 28px; font-weight: bold; background: transparent;
+            color: #880000; width: 23%; text-align: center; box-sizing: border-box; letter-spacing: 2px;
+        }
+        .btn.selected { color: #ff0033; border-color: #ff0033; text-shadow: 0 0 5px #ff0000; }
+        .btn.selected::before { content: "♥ "; color: #ff0000; }
+
+        /* --- TELAS DE INTERFACE --- */
+        #cutscene-container {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; padding: 40px; box-sizing: border-box; cursor: pointer;
+        }
+        #cutscene-text { font-size: 32px; font-weight: bold; color: #ff0033; text-align: center; line-height: 1.8; max-width: 800px; letter-spacing: 2px; text-shadow: 0 0 8px rgba(255,0,0,0.5); }
+        #click-prompt { position: absolute; bottom: 40px; font-size: 20px; color: #666; animation: pulse 1s infinite alternate; }
+        @keyframes pulse { 0% { opacity: 0.3; } 100% { opacity: 1; } }
+
+        /* --- NOVO GAME OVER CRÍTICO (CORROMPIDO) --- */
+        #game-over-screen {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000;
+            display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 300; box-shadow: inset 0 0 100px #ff0000;
+        }
+        #game-over-glitch-layer {
+            position: absolute; width: 100%; height: 100%; background: transparent; pointer-events: none; opacity: 0.15;
+            background-image: linear-gradient(rgba(18, 10, 10, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%;
+        }
+        #game-over-screen h1 { color: #ff0000; font-size: 96px; margin: 0; letter-spacing: 12px; font-weight: 900; text-shadow: 0 0 30px #ff0000; animation: text-shake 0.1s infinite; }
+        #game-over-dialogue { font-size: 26px; color: #bbb; text-align: center; line-height: 1.8; max-width: 750px; min-height: 120px; margin-top: 30px; font-weight: bold; letter-spacing: 1px; }
+        #game-over-prompt { margin-top: 40px; color: #555; font-size: 20px; letter-spacing: 3px; }
+        @keyframes text-shake { 0% { transform: translate(2px, -1px); } 100% { transform: translate(-2px, 2px) skewX(-5deg); } }
+    </style>
+</head>
+<body>
+
+    <!-- Cutscene de Entrada -->
+    <div id="cutscene-container" onclick="initAndStart()">
+        <div id="cutscene-text"></div>
+        <div id="click-prompt">[ CLIQUE NA TELA PARA INICIAR ]</div>
+    </div>
+
+    <!-- Novo Estágio Inicial Jogável -->
+    <div id="intro-playable-stage">
+        <div id="buggy-hall">
+            <div class="glitch-pillar" style="--px: 300px;"></div>
+            <div class="glitch-pillar" style="--px: 750px;"></div>
+            <div class="glitch-pillar" style="--px: 1200px;"></div>
+            <div class="glitch-pillar" style="--px: 1700px;"></div>
+            <div id="cliff-edge"></div>
+        </div>
+        <div id="frisk-overworld"></div>
+        <div id="void-text-warn">&lt;&lt; O PENHASCO DO VAZIO &gt;&gt;</div>
+    </div>
+
+    <!-- Cenário Principal da Luta -->
+    <div id="game-container">
+        <div id="monster-area">
+            <div class="retro-boss" id="boss-sprite"></div>
+            <div id="boss-damage-container">
+                <div id="damage-number">MISS</div>
+                <div class="boss-hp-wrapper">
+                    <div id="boss-hp-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="battle-box">
+            <div id="dialogue-text"></div>
+            <div id="attack-ui">
+                <div id="attack-target"></div>
+                <div id="attack-bar"></div>
+            </div>
+            <div id="laser-v-warn" class="laser-v-warn"></div>
+            <div id="laser-v-beam" class="laser-v-beam"></div>
+            <div id="laser-h-warn" class="laser-h-warn"></div>
+            <div id="laser-h-beam" class="laser-h-beam"></div>
+            <div id="soul"></div>
+        </div>
+
+        <div id="hud">
+            <span style="color: #ff0033;">FRISK  LV 666</span>
+            <div class="hp-bar-container"><div id="hp-bar"></div></div>
+            <span>HP <span id="id-hp-val">90</span> / 90</span>
+        </div>
+
+        <div id="buttons-container">
+            <div class="btn selected" id="btn-0">LUTAR</div>
+            <div class="btn" id="btn-1">AGIR</div>
+            <div class="btn" id="btn-2">ITENS</div>
+            <div class="btn" id="btn-3">POUPAR</div>
+        </div>
+    </div>
+
+    <!-- Nova Tela de Game Over Especial -->
+    <div id="game-over-screen">
+        <div id="game-over-glitch-layer"></div>
+        <h1>S I S T E M A   F A L H O U</h1>
+        <div id="game-over-dialogue"></div>
+        <div id="game-over-prompt">Pressione [ Z ] para Reiniciar o Universo do Zero</div>
+    </div>
+
+    <script>
+        const gameState = {
+            playerHp: 90, maxPlayerHp: 90,
+            monsterHp: 500, maxMonsterHp: 500, 
+            currentTurn: 'init_screen', 
+            selectedButton: 0,
+            subMenuType: '', subMenuIndex: 0,
+            attackCounter: 0, stabilizeCount: 0,
+            isSpareable: false, isGameOver: false
+        };
+
+        // Estado do mapa inicial jogável
+        const introWorldState = {
+            playerX: 100, playerY: 0, speed: 6,
+            cameraX: 0, cliffPosition: 2100
+        };
+
+        let itemsInventory = [];
+        function resetItems() {
+            itemsInventory = [
+                { name: "Torta Apodrecida (+90 HP)", heal: 90, used: false },
+                { name: "Sopa de Erros (+45 HP)", heal: 45, used: false },
+                { name: "Matriz Falsa (+30 HP)", heal: 30, used: false }
+            ];
+        }
+        resetItems();
+
+        const actOptions = ["Checar", "Forçar Código"];
+        const scaryCheckMessages = [
+            "* O arquivo de dados dele está devorando as memórias do seu computador.",
+            "* Você olha para a Anomalia, mas ela já está olhando através dos seus olhos.",
+            "* Seus pecados não podem ser limpos por um reset.",
+            "* Não há ninguém vindo te salvar. Nem mesmo o criador deste jogo.",
+            "* O espaço ao seu redor está encolhendo. Você consegue respirar?",
+            "* 00000000. Tudo vai virar zero absoluto logo."
+        ];
+
+        const soulState = { x: 0, y: 0, speed: 5.5, width: 18, height: 18 };
+        const keys = {};
+        const attackBarState = { x: 0, speed: 13, animId: null }; 
+
+        const dialogueText = document.getElementById('dialogue-text');
+        const attackUi = document.getElementById('attack-ui');
+        const attackBar = document.getElementById('attack-bar');
+        const soul = document.getElementById('soul');
+        const battleBox = document.getElementById('battle-box');
+        const hpBar = document.getElementById('hp-bar');
+        const currentHpText = document.getElementById('id-hp-val');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const gameOverDialogue = document.getElementById('game-over-dialogue');
+
+        const lVWarn = document.getElementById('laser-v-warn');
+        const lVBeam = document.getElementById('laser-v-beam');
+        const lHWarn = document.getElementById('laser-h-warn');
+        const lHBeam = document.getElementById('laser-h-beam');
+
+        const bossDamageContainer = document.getElementById('boss-damage-container');
+        const damageNumber = document.getElementById('damage-number');
+        const bossHpFill = document.getElementById('boss-hp-fill');
+
+        // --- SISTEMA DE SINTETIZADOR POLIFÔNICO ---
+        let audioCtx;
+        let bgmSequencerTimeout = null;
+        let isBgmPlaying = false;
+        let currentStep = 0;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playBgmTick() {
+            if (!isBgmPlaying) return;
+            let time = audioCtx.currentTime;
+            let corruption = 1.0 - (gameState.monsterHp / gameState.maxMonsterHp);
+            let currentBpmBase = 220 - (corruption * 85); 
+            
+            const bassLine = [46, 46, 49, 43, 46, 46, 41, 38];
+            const leadMelody = [92, 110, 98, 0, 116, 87, 0, 131, 92, 110, 147, 139, 78, 93, 104, 0];
+
+            // INSTRUMENTAL 1: Baixo Sub-Grave
+            if (currentStep % 2 === 0) {
+                let oscBass = audioCtx.createOscillator();
+                let oscSub = audioCtx.createOscillator();
+                let gainBass = audioCtx.createGain();
+                let filter = audioCtx.createBiquadFilter();
+                oscBass.type = 'sawtooth';
+                let bassFreq = bassLine[(currentStep / 2) % bassLine.length];
+                oscBass.frequency.setValueAtTime(bassFreq - (corruption * 5), time);
+                oscSub.type = 'square';
+                oscSub.frequency.setValueAtTime((bassFreq / 2), time);
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(220 + (corruption * 650), time);
+                gainBass.gain.setValueAtTime(0.35 + (corruption * 0.15), time);
+                gainBass.gain.exponentialRampToValueAtTime(0.001, time + (currentBpmBase / 1000) * 1.9);
+                oscBass.connect(filter); oscSub.connect(filter); filter.connect(gainBass); gainBass.connect(audioCtx.destination);
+                oscBass.start(time); oscBass.stop(time + 0.5); oscSub.start(time); oscSub.stop(time + 0.5);
+            }
+
+            // INSTRUMENTAL 2: Lead Agonizante
+            let leadFreq = leadMelody[currentStep % leadMelody.length];
+            if (leadFreq > 0 && (currentStep % 2 === 1 || corruption > 0.4)) {
+                let oscLead = audioCtx.createOscillator();
+                let gainLead = audioCtx.createGain();
+                oscLead.type = corruption > 0.5 ? 'sawtooth' : 'triangle';
+                let glitchDetune = (Math.random() * 12 * corruption) - (6 * corruption);
+                oscLead.frequency.setValueAtTime(leadFreq + glitchDetune, time);
+                gainLead.gain.setValueAtTime(0.14 + (corruption * 0.08), time);
+                gainLead.gain.exponentialRampToValueAtTime(0.001, time + 0.4);
+                oscLead.connect(gainLead); gainLead.connect(audioCtx.destination);
+                oscLead.start(time); oscLead.stop(time + 0.45);
+            }
+
+            // INSTRUMENTAL 3: Estática Industrial
+            if (currentStep % 4 === 0 || (corruption > 0.6 && currentStep % 2 === 0)) {
+                let bufferSize = audioCtx.sampleRate * 0.1;
+                let buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                let data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                let noiseNode = audioCtx.createBufferSource(); noiseNode.buffer = buffer;
+                let noiseFilter = audioCtx.createBiquadFilter(); noiseFilter.type = 'bandpass';
+                noiseFilter.frequency.setValueAtTime(150 + (corruption * 900), time);
+                let noiseGain = audioCtx.createGain();
+                noiseGain.gain.setValueAtTime(0.08 + (corruption * 0.12), time);
+                noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+                noiseNode.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(audioCtx.destination);
+                noiseNode.start(time);
+            }
+
+            currentStep++;
+            bgmSequencerTimeout = setTimeout(playBgmTick, currentBpmBase);
+        }
+
+        function startProceduralBGM() {
+            if (isBgmPlaying) return;
+            isBgmPlaying = true; currentStep = 0; playBgmTick();
+        }
+
+        function stopProceduralBGM() {
+            isBgmPlaying = false; clearTimeout(bgmSequencerTimeout);
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            let time = audioCtx.currentTime;
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+
+            if (type === 'select') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(220, time);
+                gain.gain.setValueAtTime(0.05, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+                osc.start(); osc.stop(time + 0.05);
+            } else if (type === 'hit') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(100, time);
+                osc.frequency.linearRampToValueAtTime(5, time + 0.3);
+                gain.gain.setValueAtTime(0.4, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
+                osc.start(); osc.stop(time + 0.3);
+            } else if (type === 'damage') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(80, time);
+                osc.frequency.setValueAtTime(200, time + 0.08);
+                gain.gain.setValueAtTime(0.4, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.35);
+                osc.start(); osc.stop(time + 0.35);
+            } else if (type === 'blip') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(75, time); 
+                gain.gain.setValueAtTime(0.12, time); gain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+                osc.start(); osc.stop(time + 0.03);
+            } else if (type === 'death-glitch') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, time);
+                osc.frequency.linearRampToValueAtTime(10, time + 2.5);
+                gain.gain.setValueAtTime(0.5, time); gain.gain.linearRampToValueAtTime(0.001, time + 2.5);
+                osc.start(); osc.stop(time + 2.5);
+            }
+        }
+
+        function initAndStart() {
+            if (gameState.currentTurn !== 'init_screen') return;
+            initAudio();
+            document.getElementById('click-prompt').style.display = 'none';
+            gameState.currentTurn = 'cutscene';
+            startIntroCutscene();
+        }
+
+        function startIntroCutscene() {
+            const cutsceneContainer = document.getElementById('cutscene-container');
+            const cutsceneText = document.getElementById('cutscene-text');
+            const lines = [
+                "Você caiu em uma falha estrutural profunda...",
+                "O código-fonte chora erros avermelhados.",
+                "Não há arquivos salvos.\nNão há fuga.",
+                "Caminhe pelo corredor quebrado e encare o fim."
+            ];
+            let lineIdx = 0, charIdx = 0; cutsceneText.innerHTML = "";
+
+            function typeWriter() {
+                if (lineIdx < lines.length) {
+                    if (charIdx < lines[lineIdx].length) {
+                        let char = lines[lineIdx].charAt(charIdx);
+                        cutsceneText.innerHTML += char;
+                        if (char !== " " && char !== "\n") playSound('blip');
+                        charIdx++; setTimeout(typeWriter, 40); 
+                    } else {
+                        setTimeout(() => { cutsceneText.innerHTML = ""; charIdx = 0; lineIdx++; typeWriter(); }, 1200);
+                    }
+                } else {
+                    cutsceneContainer.style.transition = "opacity 0.8s";
+                    cutsceneContainer.style.opacity = "0";
+                    setTimeout(() => {
+                        cutsceneContainer.style.display = "none";
+                        startPlayableIntroStage();
+                    }, 800);
+                }
+            }
+            typeWriter();
+        }
+
+        // --- ENTRADA NO SALÃO DE GLITCHES (JOGÁVEL) ---
+        function startPlayableIntroStage() {
+            gameState.currentTurn = 'intro-walk';
+            document.getElementById('intro-playable-stage').style.display = 'block';
+            
+            // Posiciona Frisk no centro do salão verticalmente
+            const hall = document.getElementById('buggy-hall');
+            const friskOW = document.getElementById('frisk-overworld');
+            
+            introWorldState.playerX = 100;
+            introWorldState.playerY = window.innerHeight / 2 - 19;
+            introWorldState.cameraX = 0;
+            
+            friskOW.style.left = introWorldState.playerX + 'px';
+            friskOW.style.top = introWorldState.playerY + 'px';
+            hall.style.left = '0px';
+        }
+
+        function updateIntroWalkLoop() {
+            if (gameState.currentTurn !== 'intro-walk') return;
+
+            const friskOW = document.getElementById('frisk-overworld');
+            const hall = document.getElementById('buggy-hall');
+            let moved = false;
+
+            if (keys['ArrowLeft']) { introWorldState.playerX -= introWorldState.speed; moved = true; }
+            if (keys['ArrowRight']) { introWorldState.playerX += introWorldState.speed; moved = true; }
+            
+            // Limites de locomoção vertical no salão
+            let topLimit = window.innerHeight / 2 - 70;
+            let bottomLimit = window.innerHeight / 2 + 40;
+            if (keys['ArrowUp']) { introWorldState.playerY -= introWorldState.speed; moved = true; }
+            if (keys['ArrowDown']) { introWorldState.playerY += introWorldState.speed; moved = true; }
+
+            if (introWorldState.playerX < 20) introWorldState.playerX = 20;
+            if (introWorldState.playerY < topLimit) introWorldState.playerY = topLimit;
+            if (introWorldState.playerY > bottomLimit) introWorldState.playerY = bottomLimit;
+
+            if (moved && Math.random() < 0.15) playSound('blip');
+
+            // Câmera dinâmica baseada no movimento lateral
+            if (introWorldState.playerX > window.innerWidth / 2) {
+                introWorldState.cameraX = introWorldState.playerX - window.innerWidth / 2;
+            } else {
+                introWorldState.cameraX = 0;
+            }
+
+            friskOW.style.left = (introWorldState.playerX - introWorldState.cameraX) + 'px';
+            friskOW.style.top = introWorldState.playerY + 'px';
+            hall.style.left = (-introWorldState.cameraX) + 'px';
+
+            // Gatilho do penhasco (Início definitivo da luta)
+            if (introWorldState.playerX >= introWorldState.cliffPosition) {
+                triggerBattleStart();
+            }
+        }
+
+        function triggerBattleStart() {
+            gameState.currentTurn = 'player';
+            document.getElementById('intro-playable-stage').style.display = 'none';
+            document.getElementById('game-container').style.display = 'flex';
+            document.getElementById('boss-sprite').style.display = 'block';
+            document.getElementById('hud').style.display = 'flex';
+            document.getElementById('buttons-container').style.display = 'flex';
+            
+            startProceduralBGM();
+            buildDefaultTurnText();
+        }
+
+        // --- MAPA DE ENTRADAS DE TECLADO ---
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            if (gameState.currentTurn !== 'cutscene' && gameState.currentTurn !== 'init_screen' && gameState.currentTurn !== 'intro-walk') {
+                initAudio(); startProceduralBGM();
+            }
+
+            if (gameState.isGameOver) {
+                if (e.key === 'z' || e.key === 'Z') fullHardReset();
+                return;
+            }
+
+            if (gameState.currentTurn === 'player') {
+                if (e.key === 'ArrowLeft') changeSelection(-1);
+                if (e.key === 'ArrowRight') changeSelection(1);
+                if (e.key === 'z' || e.key === 'Z') handlePlayerSelection();
+            } else if (gameState.currentTurn === 'sub-menu') {
+                if (e.key === 'ArrowUp') changeSubMenuSelection(-1);
+                if (e.key === 'ArrowDown') changeSubMenuSelection(1);
+                if (e.key === 'x' || e.key === 'X') cancelSubMenu();
+                if (e.key === 'z' || e.key === 'Z') handleSubMenuConfirm();
+            } else if (gameState.currentTurn === 'attack-game') {
+                if (e.key === 'z' || e.key === 'Z') stopAttackBar();
+            } else if (gameState.currentTurn === 'dialogue') {
+                if (e.key === 'z' || e.key === 'Z') triggerMonsterSpeech();
+            } else if (gameState.currentTurn === 'monster-speech') {
+                if (e.key === 'z' || e.key === 'Z') startMonsterTurn();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => { keys[e.key] = false; });
+
+        function changeSelection(dir) {
+            document.getElementById(`btn-${gameState.selectedButton}`).classList.remove('selected');
+            gameState.selectedButton = (gameState.selectedButton + dir + 4) % 4;
+            document.getElementById(`btn-${gameState.selectedButton}`).classList.add('selected');
+            playSound('select');
+        }
+
+        function handlePlayerSelection() {
+            playSound('select');
+            if (gameState.selectedButton === 0) {
+                gameState.currentTurn = 'attack-game'; dialogueText.style.display = 'none';
+                attackUi.style.display = 'block'; startAttackBar();
+            } else if (gameState.selectedButton === 1) {
+                renderSubMenu('agir', actOptions);
+            } else if (gameState.selectedButton === 2) {
+                renderSubMenu('itens', itemsInventory.map(i => i.used ? "[MORTILHADO]" : i.name));
+            } else if (gameState.selectedButton === 3) {
+                executeSpare();
+            }
+        }
+
+        function renderSubMenu(type, list) {
+            gameState.currentTurn = 'sub-menu'; gameState.subMenuType = type; gameState.subMenuIndex = 0;
+            document.querySelectorAll('.btn').forEach(b => b.classList.remove('selected'));
+            let html = `<ul class="menu-list">`;
+            list.forEach((item, idx) => { html += `<li class="menu-item ${idx === 0 ? 'selected' : ''}" id="mi-${idx}">* ${item}</li>`; });
+            html += `</ul>`; dialogueText.innerHTML = html;
+        }
+
+        function changeSubMenuSelection(dir) {
+            const items = dialogueText.querySelectorAll('.menu-item');
+            if (items.length === 0) return;
+            items[gameState.subMenuIndex].classList.remove('selected');
+            gameState.subMenuIndex = (gameState.subMenuIndex + dir + items.length) % items.length;
+            items[gameState.subMenuIndex].classList.add('selected'); playSound('select');
+        }
+
+        function cancelSubMenu() { gameState.currentTurn = 'player'; buildDefaultTurnText(); }
+
+        function handleSubMenuConfirm() {
+            playSound('select'); gameState.currentTurn = 'dialogue';
+            if (gameState.subMenuType === 'agir') {
+                if (gameState.subMenuIndex === 0) {
+                    let randomScaryMsg = scaryCheckMessages[Math.floor(Math.random() * scaryCheckMessages.length)];
+                    dialogueText.innerHTML = `* ANOMALIA DECAÍDA - ATK: ERROR / DEF: ERROR\n${randomScaryMsg}`;
+                } else if (gameState.subMenuIndex === 1) {
+                    gameState.stabilizeCount++;
+                    if (gameState.stabilizeCount >= 7) {
+                        gameState.isSpareable = true;
+                        dialogueText.innerHTML = `* Você remendou as artérias digitais com força.\n* O monstro agoniza em um tom Amarelo pronto para ser POUPADO...`;
+                    } else {
+                        dialogueText.innerHTML = `* Você tenta reescrever as linhas corrompidas do monstro (${gameState.stabilizeCount}/7).\n* Os instrumentais colidem em pura desarmonia rítmica.`;
+                    }
+                }
+            } else if (gameState.subMenuType === 'itens') {
+                let item = itemsInventory[gameState.subMenuIndex];
+                if (item.used) {
+                    dialogueText.innerHTML = `* Vazio. Assim como sua esperança.`;
+                } else {
+                    item.used = true; gameState.playerHp = Math.min(gameState.maxPlayerHp, gameState.playerHp + item.heal);
+                    updateHpUI(); dialogueText.innerHTML = `* Você engoliu: ${item.name}.\n* Forçou +${item.heal} de estabilidade no seu HP.`;
+                }
+            }
+        }
+
+        function executeSpare() {
+            gameState.currentTurn = 'dialogue';
+            if (gameState.isSpareable) {
+                dialogueText.innerHTML = `* Você quebrou o ciclo de corrupção. O Monstro recua para as sombras do código.\n* Você sobreviveu à anomalia.`;
+                gameState.currentTurn = 'won'; stopProceduralBGM();
+            } else {
+                dialogueText.innerHTML = `* MISERICÓRDIA RECUSADA.\n* Seus apelos só alimentam a sede de destruição dele.`;
+            }
+        }
+
+        function startAttackBar() {
+            attackBarState.x = 0; attackBar.style.left = '0px';
+            function animate() {
+                if (gameState.currentTurn !== 'attack-game') return;
+                attackBarState.x += attackBarState.speed; attackBar.style.left = attackBarState.x + 'px';
+                if (attackBarState.x >= battleBox.clientWidth - 16) evalDamage(0);
+                else attackBarState.animId = requestAnimationFrame(animate);
+            }
+            attackBarState.animId = requestAnimationFrame(animate);
+        }
+
+        function stopAttackBar() {
+            cancelAnimationFrame(attackBarState.animId);
+            const targetX = battleBox.clientWidth / 2;
+            const barX = attackBarState.x + 8;
+            const distance = Math.abs(targetX - barX);
+
+            let damageMultiplier = 0;
+            if (distance < 20) damageMultiplier = 1.9; // Dano crítico reduzido
+            else if (distance < 70) damageMultiplier = 1.3;
+            else if (distance < 150) damageMultiplier = 0.8;
+            evalDamage(damageMultiplier);
+        }
+
+        function showMonsterDamageHUD(damage) {
+            bossDamageContainer.style.display = 'none'; void bossDamageContainer.offsetWidth; 
+            if (damage === 0) damageNumber.innerText = "MISS";
+            else damageNumber.innerText = damage;
+            let percentage = (gameState.monsterHp / gameState.maxMonsterHp) * 100;
+            bossHpFill.style.width = percentage + "%"; bossDamageContainer.style.display = 'flex';
+        }
+
+        function evalDamage(mult) {
+            attackUi.style.display = 'none'; dialogueText.style.display = 'block'; gameState.currentTurn = 'dialogue';
+            if (mult === 0) {
+                showMonsterDamageHUD(0); dialogueText.innerHTML = `* FALHA!<br>* A escuridão engoliu seu golpe.`;
+            } else {
+                let baseDamage = Math.floor(Math.random() * 12) + 30;
+                let totalDamage = Math.floor(baseDamage * mult);
+                gameState.monsterHp = Math.max(0, gameState.monsterHp - totalDamage);
+                playSound('hit'); showMonsterDamageHUD(totalDamage);
+                dialogueText.innerHTML = `* DANO COMPUTADO!<br>* Dilacerou ${totalDamage} de dados vitais do núcleo.`;
+            }
+            if (gameState.monsterHp <= 0) {
+                dialogueText.innerHTML = `* O Monstro Vazio derreteu em uma poça preta estática. O pesadelo acabou.`;
+                gameState.currentTurn = 'won'; stopProceduralBGM();
+            }
+        }
+
+        const bossSpeeches = [
+            "\"500 CAMADAS DE PURA AGONIA...\"", "\"SEU CORAÇÃO VAI PARAR PRIMEIRO...\"",
+            "\"NÃO HÁ ARQUIVO DE SALVAMENTO QUE TE SALVE AGORA.\"", "\"OUÇA O RITMO DO SEU FIM ACELERAR!\"",
+            "\"TRÊS INSTRUMENTOS CHORAM SUA MORTE...\"", "\"GLITCHES ESTÃO REESCREVENDO SUA EXISTÊNCIA!!!\"",
+            "\"A PERCUSSÃO É O SEU CORAÇÃO FALHANDO.\"", "\"SENTINDO O PESO DA INFECÇÃO VERDE?\"",
+            "\"AS LÂMINAS ROXAS VÃO CORTAR SEUS MEMBROS!\"", "\"FIM DA LINHA... APAGUE SEU HISTÓRICO...\""
+        ];
+
+        function triggerMonsterSpeech() {
+            gameState.currentTurn = 'monster-speech';
+            let msgIndex = gameState.attackCounter % bossSpeeches.length;
+            dialogueText.innerHTML = `<span style="color: #ff0022; font-weight:bold;">Anomalia Decaída:</span>\n${bossSpeeches[msgIndex]}\n\n<span style="color:#ff0033; font-size:18px;">[Pressione Z para se defender]</span>`;
+        }
+
+        let activeBullets = []; let attackInterval = null; let turnTimeoutId = null;
+
+        function startMonsterTurn() {
+            gameState.currentTurn = 'monster'; dialogueText.style.display = 'none'; soul.style.display = 'block';
+            const boxRect = battleBox.getBoundingClientRect();
+            soulState.x = (boxRect.width / 2) - (soulState.width / 2); soulState.y = (boxRect.height / 2) - (soulState.height / 2);
+            soul.style.left = soulState.x + 'px'; soul.style.top = soulState.y + 'px';
+
+            const attacks = ['muito_facil', 'facil', 'medio', 'dificil', 'muito_dificil', 'ataque_6', 'ataque_7', 'ataque_8', 'ataque_9', 'ataque_10'];
+            setTimeout(() => { if (gameState.currentTurn === 'monster' && !gameState.isGameOver) runInsaneAttack(attacks[gameState.attackCounter % attacks.length]); }, 400);
+            gameState.attackCounter++;
+        }
+
+        function runInsaneAttack(type) {
+            let duration = 8000; let tick = 0;
+            if (type === 'muito_facil') {
+                attackInterval = setInterval(() => { createBullet('star', Math.random() * battleBox.clientWidth, 0, (Math.random() - 0.5) * 8, 5); }, 140);
+            } else if (type === 'facil') {
+                attackInterval = setInterval(() => {
+                    let startX = Math.random() > 0.5 ? 0 : battleBox.clientWidth; let startY = Math.random() * battleBox.clientHeight;
+                    let dx = soulState.x - startX; let dy = soulState.y - startY; let dist = Math.sqrt(dx*dx + dy*dy);
+                    createBullet('spear', startX, startY, (dx/dist)*6.5, (dy/dist)*6.5);
+                }, 350);
+            } else if (type === 'medio') {
+                attackInterval = setInterval(() => {
+                    createBullet('bone', battleBox.clientWidth, battleBox.clientHeight - 140, -7, 0); 
+                    createBullet('star', battleBox.clientWidth, 30 + (Math.sin(tick)*35), -7, 0); tick++;
+                }, 240);
+            } else if (type === 'dificil') {
+                let angleOffset = 0;
+                attackInterval = setInterval(() => {
+                    for(let i=0; i<10; i++) {
+                        let angle = (i * Math.PI / 5) + angleOffset;
+                        let spawnX = (battleBox.clientWidth / 2) + Math.cos(angle) * 220; let spawnY = (battleBox.clientHeight / 2) + Math.sin(angle) * 220;
+                        createBullet('petal', spawnX, spawnY, -Math.cos(angle)*4, -Math.sin(angle)*4);
+                    }
+                    angleOffset += 0.4;
+                }, 450);
+            } else if (type === 'muito_dificil') {
+                let laserActive = false;
+                attackInterval = setInterval(() => {
+                    tick++;
+                    if (tick % 4 === 1) {
+                        let targetX = soulState.x - 20; let targetY = soulState.y - 15;
+                        lVWarn.style.left = targetX + 'px'; lVWarn.style.display = 'block'; lHWarn.style.top = targetY + 'px'; lHWarn.style.display = 'block';
+                        setTimeout(() => {
+                            lVWarn.style.display = 'none'; lHWarn.style.display = 'none';
+                            lVBeam.style.left = targetX + 'px'; lVBeam.style.display = 'block'; lHBeam.style.top = targetY + 'px'; lHBeam.style.display = 'block';
+                            laserActive = true;
+                            setTimeout(() => { lVBeam.style.display = 'none'; lHBeam.style.display = 'none'; laserActive = false; }, 400);
+                        }, 400); 
+                    }
+                    createBullet('star', 0, Math.random()*battleBox.clientHeight, 5, (Math.random()-0.5)*6, true);
+                }, 250);
+                gameState.checkLaser = () => {
+                    if (laserActive) {
+                        let bx = parseFloat(lVBeam.style.left); let by = parseFloat(lHBeam.style.top);
+                        if ((soulState.x + soulState.width > bx && soulState.x < bx + 70) || (soulState.y + soulState.height > by && soulState.y < by + 60)) takeDamage();
+                    }
+                };
+            } else if (type === 'ataque_6') {
+                attackInterval = setInterval(() => { createBullet('bone', battleBox.clientWidth, battleBox.clientHeight - 140, -6, 0); createBullet('bone-inv', 0, 0, 6, 0); }, 400);
+            } else if (type === 'ataque_7') {
+                let laserActive = true; lVWarn.style.left = '80px'; lVWarn.style.display = 'block';
+                let rWarn = lVWarn.cloneNode(); rWarn.style.left = (battleBox.clientWidth - 150) + 'px'; battleBox.appendChild(rWarn); rWarn.style.display = 'block';
+                setTimeout(() => {
+                    lVWarn.style.display = 'none'; rWarn.style.display = 'none'; rWarn.remove();
+                    lVBeam.style.left = '80px'; lVBeam.style.display = 'block';
+                    let rBeam = lVBeam.cloneNode(); rBeam.style.left = (battleBox.clientWidth - 150) + 'px'; battleBox.appendChild(rBeam); rBeam.style.display = 'block';
+                    setTimeout(() => { lVBeam.style.display = 'none'; rBeam.style.display = 'none'; rBeam.remove(); laserActive = false; }, 6500);
+                }, 600);
+                attackInterval = setInterval(() => { createBullet('petal', Math.random()*battleBox.clientWidth, 0, 0, 5.5); }, 160);
+                gameState.checkLaser = () => { if (laserActive && (soulState.x < 150 || soulState.x > battleBox.clientWidth - 150)) takeDamage(); };
+            } else if (type === 'ataque_8') {
+                attackInterval = setInterval(() => { createBullet('glitch-block', Math.random() * battleBox.clientWidth, 0, 0, 6.5); }, 200);
+            } else if (type === 'ataque_9') {
+                attackInterval = setInterval(() => { createBullet('spear', 0, Math.random() * battleBox.clientHeight, 5.5, 0); createBullet('spear', battleBox.clientWidth, Math.random() * battleBox.clientHeight, -5.5, 0); }, 300);
+            } else if (type === 'ataque_10') {
+                let hLaser = false;
+                attackInterval = setInterval(() => {
+                    tick++;
+                    if (tick % 5 === 1) {
+                        let targetY = soulState.y - 15; lHWarn.style.top = targetY + 'px'; lHWarn.style.display = 'block';
+                        setTimeout(() => {
+                            lHWarn.style.display = 'none'; lHBeam.style.top = targetY + 'px'; lHBeam.style.display = 'block'; hLaser = true;
+                            setTimeout(() => { lHBeam.style.display = 'none'; hLaser = false; }, 450);
+                        }, 400);
+                    }
+                    createBullet('star', Math.random()*battleBox.clientWidth, 0, (Math.random()-0.5)*9, 5, true);
+                }, 220);
+                gameState.checkLaser = () => { if (hLaser && soulState.y + soulState.height > parseFloat(lHBeam.style.top) && soulState.y < parseFloat(lHBeam.style.top) + 60) takeDamage(); };
+            }
+
+            turnTimeoutId = setTimeout(() => {
+                clearInterval(attackInterval); gameState.checkLaser = null;
+                lVWarn.style.display = 'none'; lVBeam.style.display = 'none'; lHWarn.style.display = 'none'; lHBeam.style.display = 'none';
+                if (!gameState.isGameOver && gameState.currentTurn === 'monster') endMonsterTurn();
+            }, duration);
+        }
+
+        function createBullet(type, x, y, vx, vy, bounces = false) {
+            const el = document.createElement('div'); el.className = `bullet ${type}`; el.style.left = x + 'px'; el.style.top = y + 'px'; battleBox.appendChild(el);
+            activeBullets.push({
+                el, x, y, vx, vy, bounces,
+                w: type === 'spear' ? 65 : (type.includes('bone') ? 20 : (type.includes('block') ? 30 : 16)),
+                h: type === 'spear' ? 10 : (type.includes('bone') ? 140 : (type.includes('block') ? 30 : 16))
+            });
+        }
+
+        function endMonsterTurn() {
+            document.querySelectorAll('.bullet').forEach(b => b.remove()); activeBullets = [];
+            gameState.currentTurn = 'player'; soul.style.display = 'none'; dialogueText.style.display = 'block'; buildDefaultTurnText();
+        }
+
+        function buildDefaultTurnText() {
+            document.getElementById(`btn-${gameState.selectedButton}`).classList.add('selected');
+            if (gameState.isSpareable) dialogueText.innerHTML = `* A abominação racha por completo. O nome dela chora em amarelo... É sua chance de dar fim a isso.`;
+            else dialogueText.innerHTML = `* Três arranjos musicais malditos distorcem seu senso de realidade. O chão vibra.`;
+        }
+
+        // --- LOOP PRINCIPAL DO JOGO (ENGINE COORDENADA) ---
+        function update() {
+            if (gameState.currentTurn === 'intro-walk') {
+                updateIntroWalkLoop();
+            }
+            else if (gameState.currentTurn === 'monster' && !gameState.isGameOver) {
+                if (keys['ArrowUp']) soulState.y -= soulState.speed;
+                if (keys['ArrowDown']) soulState.y += soulState.speed;
+                if (keys['ArrowLeft']) soulState.x -= soulState.speed;
+                if (keys['ArrowRight']) soulState.x += soulState.speed;
+
+                const maxW = battleBox.clientWidth - soulState.width - 6; const maxH = battleBox.clientHeight - soulState.height - 6;
+                if (soulState.x < 6) soulState.x = 6; if (soulState.x > maxW) soulState.x = maxW;
+                if (soulState.y < 6) soulState.y = 6; if (soulState.y > maxH) soulState.y = maxH;
+                soul.style.left = soulState.x + 'px'; soul.style.top = soulState.y + 'px';
+
+                if (gameState.checkLaser) gameState.checkLaser();
+
+                for (let i = activeBullets.length - 1; i >= 0; i--) {
+                    let b = activeBullets[i]; b.x += b.vx; b.y += b.vy;
+                    if (b.bounces) {
+                        if (b.y <= 0 || b.y >= battleBox.clientHeight - b.h) b.vy = -b.vy;
+                        if (b.x <= 0 || b.x >= battleBox.clientWidth - b.w) b.vx = -b.vx;
+                    }
+                    b.el.style.left = b.x + 'px'; b.el.style.top = b.y + 'px';
+
+                    if (soulState.x < b.x + b.w && soulState.x + soulState.width > b.x && soulState.y < b.y + b.h && soulState.y + soulState.height > b.y) {
+                        b.el.remove(); activeBullets.splice(i, 1); takeDamage(); continue;
+                    }
+                    if (b.x < -150 || b.x > battleBox.clientWidth + 150 || b.y < -150 || b.y > battleBox.clientHeight + 150) { b.el.remove(); activeBullets.splice(i, 1); }
+                }
+            }
+            requestAnimationFrame(update);
+        }
+
+        function takeDamage() {
+            if (gameState.isGameOver) return;
+            gameState.playerHp = Math.max(0, gameState.playerHp - 10); updateHpUI(); playSound('damage');
+            if (gameState.playerHp <= 0) triggerGameOverCutscene();
+        }
+
+        function updateHpUI() { currentHpText.innerText = gameState.playerHp; hpBar.style.width = (gameState.playerHp / gameState.maxPlayerHp) * 100 + '%'; }
+
+        // --- NOVA CUTSCENE DE GAME OVER CINEMATOGRÁFICA ---
+        function triggerGameOverCutscene() {
+            gameState.isGameOver = true;
+            clearInterval(attackInterval); clearTimeout(turnTimeoutId);
+            stopProceduralBGM();
+            playSound('death-glitch');
+
+            // Esconde elementos principais para focar no colapso do Game Over
+            document.getElementById('game-container').style.display = 'none';
+            gameOverScreen.style.display = 'flex';
+            gameOverDialogue.innerHTML = "";
+
+            const gameOverMsg = "Sua determinação falhou perante a infecção do código...\nSua alma despedaçou-se em infinitas strings corrompidas.\nO universo será resetado completamente.";
+            let charIdx = 0;
+
+            function typeGameOverText() {
+                if (!gameState.isGameOver) return; 
+                if (charIdx < gameOverMsg.length) {
+                    let char = gameOverMsg.charAt(charIdx);
+                    gameOverDialogue.innerHTML += char;
+                    if (char !== " " && char !== "\n") {
+                        playSound('blip');
+                    }
+                    charIdx++;
+                    setTimeout(typeGameOverText, 55);
+                }
+            }
+            setTimeout(typeGameOverText, 800);
+        }
+
+        // --- RESET COMPLETO DO ZERO ABSOLUTO ---
+        function fullHardReset() {
+            gameState.playerHp = 90;
+            gameState.monsterHp = 500;
+            gameState.attackCounter = 0;
+            gameState.stabilizeCount = 0;
+            gameState.isSpareable = false;
+            gameState.selectedButton = 0;
+            gameState.isGameOver = false;
+
+            // Limpa entidades e projéteis da partida antiga
+            document.querySelectorAll('.bullet').forEach(b => b.remove());
+            activeBullets = [];
+            resetItems();
+
+            // Esconde menus e interfaces de luta
+            gameOverScreen.style.display = 'none';
+            soul.style.display = 'none';
+            attackUi.style.display = 'none';
+            bossDamageContainer.style.display = 'none';
+            dialogueText.style.display = 'block';
+            
+            updateHpUI();
+            document.querySelectorAll('.btn').forEach(b => b.classList.remove('selected'));
+            document.getElementById('btn-0').classList.add('selected');
+
+            // Reinicia o motor de áudio e volta Frisk para o início do Salão Bugado
+            initAudio();
+            startPlayableIntroStage();
+        }
+
+        requestAnimationFrame(update);
+    </script>
+</body>
+</html>
